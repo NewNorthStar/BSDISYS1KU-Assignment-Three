@@ -28,7 +28,7 @@ func runChatService() {
 	client := proto.NewChittyChatServiceClient(conn)
 	ctx := context.Background()
 
-	stream, err := client.JoinMessageBoard(ctx, joinConfirmMessage())
+	stream, err := client.JoinMessageBoard(ctx, confirmMessage())
 	if err != nil {
 		log.Fatalf("Failed to obtain stream: %v", err)
 	}
@@ -43,6 +43,7 @@ func runChatService() {
 	}
 }
 
+// Establishes connection to the server.
 func getConnectionToServer() *grpc.ClientConn {
 	conn, err := grpc.NewClient("localhost:5050", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -51,7 +52,8 @@ func getConnectionToServer() *grpc.ClientConn {
 	return conn
 }
 
-func joinConfirmMessage() *proto.Confirm {
+// Obtains a proto.Confirm to send to the server.
+func confirmMessage() *proto.Confirm {
 	return &proto.Confirm{
 		Author:    name,
 		LamportTs: -1,
