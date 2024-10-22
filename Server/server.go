@@ -12,10 +12,38 @@ import (
 
 type ChittyChatServer struct {
 	proto.UnimplementedChittyChatServiceServer
-	messageLog []string
+	clients []grpc.ServerStreamingServer[proto.Message]
 }
 
-func (s *ChittyChatServer) JoinMessageBoard(*proto.Confirm, grpc.ServerStreamingServer[proto.Message]) error {
+func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.ServerStreamingServer[proto.Message]) error {
+	log.Printf("JoinMessageBoard call: %v\n", confirm)
+
+	err := stream.Send(&proto.Message{
+		Content:   "Welcome to ChittyChat, " + confirm.Author + "!",
+		Author:    "ChittyService",
+		LamportTs: 123,
+	})
+	if err != nil {
+		log.Printf("JoinMessageBoard error: %v\n", err)
+		return err
+	}
+
+	log.Printf("Good client, adding\n")
+	s.clients = append(s.clients, stream)
+
+	log.Printf("Broadcasting join message...")
+	// Else we start a broadcast
+	for index, cli := range s.clients {
+		err := cli.Send(&proto.Message{
+			Content:   confirm.Author + " has arrived!",
+			Author:    "ChittyService",
+			LamportTs: 123,
+		})
+		if err != nil {
+			// Remove unresponsive client stream.
+			s.clients = append(s.clients[:index], s.clients[index+1:]...)
+		}
+	}
 	return nil
 }
 
@@ -28,7 +56,7 @@ func (s *ChittyChatServer) PostMessage(ctx context.Context, in *proto.Message) (
 
 func main() {
 	server := ChittyChatServer{
-		messageLog: make([]string, 0),
+		clients: make([]grpc.ServerStreamingServer[proto.Message], 0),
 	}
 	go server.start()
 
