@@ -14,8 +14,11 @@ import (
 )
 
 var stdIn = setScanner()
+var ctx context.Context = context.Background()
+
 var name string
 
+// Start point for program.
 func main() {
 	fmt.Print("Enter your callsign and press ENTER: ")
 	name = nextLine()
@@ -23,26 +26,15 @@ func main() {
 	runChatService()
 }
 
+// Overall method for running the chat service.
 func runChatService() {
 	conn := getConnectionToServer()
 	defer conn.Close()
+
 	client := proto.NewChittyChatServiceClient(conn)
-	ctx := context.Background()
+	stream := joinChatBoard(client)
 
-	stream, err := client.JoinMessageBoard(ctx, confirmMessage())
-	if err != nil {
-		log.Fatalf("Failed to obtain stream: %v", err)
-	}
-
-	for {
-		msg, err := stream.Recv()
-		if err == io.EOF {
-			fmt.Println("Stream closed. Bye!")
-			return
-		} else if err != nil {
-			log.Fatal(err)
-		}
-		printMessage(msg)
+	for pollStream(stream) {
 	}
 }
 
@@ -55,7 +47,7 @@ func getConnectionToServer() *grpc.ClientConn {
 	return conn
 }
 
-// Obtains a proto.Confirm to send to the server.
+// Obtains a proto.Confirm to send.
 func confirmMessage() *proto.Confirm {
 	return &proto.Confirm{
 		Author:    name,
@@ -63,15 +55,41 @@ func confirmMessage() *proto.Confirm {
 	}
 }
 
+// Joins the chat board. Returns a stream of posted messages from the chat.
+func joinChatBoard(client proto.ChittyChatServiceClient) grpc.ServerStreamingClient[proto.Message] {
+	stream, err := client.JoinMessageBoard(ctx, confirmMessage())
+	if err != nil {
+		log.Fatalf("Failed to obtain stream: %v", err)
+	}
+	return stream
+}
+
+// Loop routine for polling stream from server and displaying messages from the chat board.
+// Returns false when loop should interrupt.
+func pollStream(stream grpc.ServerStreamingClient[proto.Message]) bool {
+	msg, err := stream.Recv()
+	if err == io.EOF {
+		fmt.Println("Stream closed. Bye!")
+		return false
+	} else if err != nil {
+		log.Fatal(err)
+	}
+	printMessage(msg)
+	return true
+}
+
+// Prints the standard chat message format to console.
 func printMessage(message *proto.Message) {
 	fmt.Printf("%d %s: %s\n", message.LamportTs, message.Author, message.Content)
 }
 
+// Setup for stdIn (input from console). Any scanner settings go here.
 func setScanner() *bufio.Scanner {
 	var sc = bufio.NewScanner(os.Stdin)
 	return sc
 }
 
+// Obtains next line from stdIn.
 func nextLine() string {
 	stdIn.Scan()
 	return stdIn.Text()
