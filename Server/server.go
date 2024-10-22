@@ -15,12 +15,15 @@ type ChittyChatServer struct {
 	messageLog []string
 }
 
-func (s *ChittyChatServer) PostMessage(ctx context.Context, in *proto.Message) (*proto.Confirm, error) {
-
+func (s *ChittyChatServer) JoinMessageBoard(*proto.Confirm, grpc.ServerStreamingServer[proto.Message]) error {
+	return nil
 }
 
-func (s *ChittyChatServer) JoinMessageBoard(ctx context.Context, in *proto.Confirm) (grpc.ServerStreamingClient[Message], error) {
-
+func (s *ChittyChatServer) PostMessage(ctx context.Context, in *proto.Message) (*proto.Confirm, error) {
+	return &proto.Confirm{
+		Author:    "ChittyService",
+		LamportTs: 123,
+	}, nil
 }
 
 func main() {
