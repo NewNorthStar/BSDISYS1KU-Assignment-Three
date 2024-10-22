@@ -19,34 +19,42 @@ func main() {
 	fmt.Print("Enter your callsign and press ENTER: ")
 	name = nextLine()
 
-	run()
+	runChatService()
 }
 
-func run() {
-	conn, err := grpc.NewClient("localhost:5050", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("Did not work")
-	}
+func runChatService() {
+	conn := getConnectionToServer()
 	defer conn.Close()
-
 	client := proto.NewChittyChatServiceClient(conn)
-
 	ctx := context.Background()
-	stream, err := client.JoinMessageBoard(ctx, &proto.Confirm{
-		Author:    name,
-		LamportTs: -1,
-	})
+
+	stream, err := client.JoinMessageBoard(ctx, joinConfirmMessage())
 	if err != nil {
-		log.Fatalf("Did not work2")
+		log.Fatalf("Failed to obtain stream: %v", err)
 	}
 
 	for {
 		var message proto.Message
-		err = stream.RecvMsg(&message)
+		err := stream.RecvMsg(&message)
 		if err != nil {
 			log.Fatal(err)
 		}
 		printMessage(&message)
+	}
+}
+
+func getConnectionToServer() *grpc.ClientConn {
+	conn, err := grpc.NewClient("localhost:5050", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Failed to obtain connection: %v", err)
+	}
+	return conn
+}
+
+func joinConfirmMessage() *proto.Confirm {
+	return &proto.Confirm{
+		Author:    name,
+		LamportTs: -1,
 	}
 }
 

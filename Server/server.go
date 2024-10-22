@@ -32,7 +32,7 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 	log.Printf("JoinMessageBoard call: %v\n", confirm)
 
 	err := stream.Send(&proto.Message{
-		Content:   "🚀 Welcome to ChittyChat, " + confirm.Author + "! 🚀",
+		Content:   "\U0001F680 Welcome to ChittyChat, " + confirm.Author + "! \U0001F680",
 		Author:    s.name,
 		LamportTs: getTime(),
 	})
