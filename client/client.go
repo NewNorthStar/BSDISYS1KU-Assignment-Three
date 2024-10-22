@@ -1,33 +1,28 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	proto "example/chittychat/grpc"
 	"fmt"
 	"log"
-	"strconv"
+	"os"
 
-	"golang.org/x/exp/rand"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-type client struct {
-	name string
-}
+var stdIn = setScanner()
+var name string
 
 func main() {
-	client := client{
-		name: strconv.Itoa(rand.Intn(100000)),
-	}
+	fmt.Print("Enter your callsign and press ENTER: ")
+	name = nextLine()
 
-	client.run()
-	// wait := make(chan bool)
-	// <-wait
-
+	run()
 }
 
-func (c *client) run() {
+func run() {
 	conn, err := grpc.NewClient("localhost:5050", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Did not work")
@@ -38,7 +33,7 @@ func (c *client) run() {
 
 	ctx := context.Background()
 	stream, err := client.JoinMessageBoard(ctx, &proto.Confirm{
-		Author:    c.name,
+		Author:    name,
 		LamportTs: -1,
 	})
 	if err != nil {
@@ -57,4 +52,14 @@ func (c *client) run() {
 
 func printMessage(message *proto.Message) {
 	fmt.Printf("%d %s: %s\n", message.LamportTs, message.Author, message.Content)
+}
+
+func setScanner() *bufio.Scanner {
+	var sc = bufio.NewScanner(os.Stdin)
+	return sc
+}
+
+func nextLine() string {
+	stdIn.Scan()
+	return stdIn.Text()
 }
