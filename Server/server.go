@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"strconv"
 
 	"google.golang.org/grpc"
 )
@@ -46,7 +45,7 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 	// Else we start a broadcast
 	log.Printf("Broadcasting join message...")
 	s.broadcastMessage(&proto.Message{
-		Content:   "Participant " + confirm.Author + " joined Chitty-Chat at Lamport time " + strconv.Itoa(int(getTime())),
+		Content:   "Everyone please welcome '" + confirm.Author + "' to the chat!",
 		Author:    s.name,
 		LamportTs: getTime(),
 	})
@@ -69,7 +68,7 @@ func getTime() int64 {
 func main() {
 	server := ChittyChatServer{
 		clients: make([]grpc.ServerStreamingServer[proto.Message], 0),
-		name:    "ChittyService",
+		name:    "ChittyServer",
 	}
 	go server.start()
 

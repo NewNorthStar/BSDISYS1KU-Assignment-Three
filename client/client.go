@@ -5,6 +5,7 @@ import (
 	"context"
 	proto "example/chittychat/grpc"
 	"fmt"
+	"io"
 	"log"
 	"os"
 
@@ -34,12 +35,14 @@ func runChatService() {
 	}
 
 	for {
-		var message proto.Message
-		err := stream.RecvMsg(&message)
-		if err != nil {
+		msg, err := stream.Recv()
+		if err == io.EOF {
+			fmt.Println("Stream closed. Bye!")
+			return
+		} else if err != nil {
 			log.Fatal(err)
 		}
-		printMessage(&message)
+		printMessage(msg)
 	}
 }
 
