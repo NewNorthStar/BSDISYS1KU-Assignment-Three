@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 
 	"google.golang.org/grpc"
 )
@@ -13,6 +14,18 @@ import (
 type ChittyChatServer struct {
 	proto.UnimplementedChittyChatServiceServer
 	clients []grpc.ServerStreamingServer[proto.Message]
+	name    string
+}
+
+func (s *ChittyChatServer) broadcastMessage(message *proto.Message) {
+	for index, cli := range s.clients {
+		err := cli.Send(message)
+		if err != nil {
+			// Remove unresponsive client stream.
+			// TODO: add log message
+			s.clients = append(s.clients[:index], s.clients[index+1:]...)
+		}
+	}
 }
 
 func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.ServerStreamingServer[proto.Message]) error {
@@ -20,8 +33,8 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 
 	err := stream.Send(&proto.Message{
 		Content:   "Welcome to ChittyChat, " + confirm.Author + "!",
-		Author:    "ChittyService",
-		LamportTs: 123,
+		Author:    s.name,
+		LamportTs: getTime(),
 	})
 	if err != nil {
 		log.Printf("JoinMessageBoard error: %v\n", err)
@@ -30,33 +43,33 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 
 	log.Printf("Good client, adding\n")
 	s.clients = append(s.clients, stream)
-
-	log.Printf("Broadcasting join message...")
 	// Else we start a broadcast
-	for index, cli := range s.clients {
-		err := cli.Send(&proto.Message{
-			Content:   confirm.Author + " has arrived!",
-			Author:    "ChittyService",
-			LamportTs: 123,
-		})
-		if err != nil {
-			// Remove unresponsive client stream.
-			s.clients = append(s.clients[:index], s.clients[index+1:]...)
-		}
-	}
+	log.Printf("Broadcasting join message...")
+	s.broadcastMessage(&proto.Message{
+		Content:   "Participant " + confirm.Author + " joined Chitty-Chat at Lamport time " + strconv.Itoa(int(getTime())),
+		Author:    s.name,
+		LamportTs: getTime(),
+	})
+	log.Printf("JoinMessageBoard was executed successfully.\n")
 	return nil
 }
 
 func (s *ChittyChatServer) PostMessage(ctx context.Context, in *proto.Message) (*proto.Confirm, error) {
+	s.broadcastMessage(&proto.Message{})
 	return &proto.Confirm{
-		Author:    "ChittyService",
-		LamportTs: 123,
+		Author:    s.name,
+		LamportTs: getTime(),
 	}, nil
+}
+
+func getTime() int64 {
+	return 123
 }
 
 func main() {
 	server := ChittyChatServer{
 		clients: make([]grpc.ServerStreamingServer[proto.Message], 0),
+		name:    "ChittyService",
 	}
 	go server.start()
 
