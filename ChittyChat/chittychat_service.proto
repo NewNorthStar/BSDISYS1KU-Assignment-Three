@@ -1,0 +1,33 @@
+option go_package = "BSDISYS1KU-Assignment-Three/ChittyChat/chittychat_service";
+package ChittyChat;
+
+service ChittyChat {
+    //A client can publish a message to the service
+    rpc PublishMessage(Message) returns (Empty);
+    
+    //The server can broadcast a recieved message to all participants (including the original sender?)
+    rpc BroadcastMessage(Message) returns (stream Message);
+
+    //The server can broadcast a message when a participant joins the chat.
+    rpc BroadcastParticipant(Participant) returns (JoinMessage);
+}
+
+message Message {
+    //A message has a UTF-8 string with a maximum of 128 characters.
+    //It also has a timestamp (Vector or Lamport)
+    required string content = 1;
+    required string sender = 2;
+    required int64 timestamp = 3;
+}
+
+message Participant {
+    required string name = 1;
+}
+
+
+message JoinMessage {
+    required string participant = 1;
+    required int64 timestamp = 2;
+}
+
+message Empty{}
