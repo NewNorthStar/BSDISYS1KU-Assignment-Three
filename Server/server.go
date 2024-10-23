@@ -14,19 +14,14 @@ import (
 
 type ChittyChatServer struct {
 	proto.UnimplementedChittyChatServiceServer
-	clients []grpc.ServerStreamingServer[proto.Message]
+	clients []client
 	name    string
 }
 
-func (s *ChittyChatServer) broadcastMessage(message *proto.Message) {
-	for index, cli := range s.clients {
-		err := cli.Send(message)
-		if err != nil {
-			// Remove unresponsive client stream.
-			// TODO: add log message
-			s.clients = append(s.clients[:index], s.clients[index+1:]...)
-		}
-	}
+type client struct {
+	name   string
+	feed   chan *proto.Message
+	closed chan bool
 }
 
 func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.ServerStreamingServer[proto.Message]) error {
@@ -36,16 +31,21 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 		return err
 	}
 
-	log.Printf("Good client, adding\n")
-	s.clients = append(s.clients, stream)
-	// Else we start a broadcast
-	log.Printf("Broadcasting join message...")
+	cli := client{
+		name:   confirm.Author,
+		feed:   make(chan *proto.Message, 20),
+		closed: make(chan bool),
+	}
+	s.clients = append(s.clients, cli)
 	s.broadcastMessage(&proto.Message{
 		Content:   "Everyone please welcome '" + confirm.Author + "' to the chat!",
 		Author:    s.name,
 		LamportTs: getTime(),
 	})
-	log.Printf("JoinMessageBoard was executed successfully.\n")
+
+	pushStream(stream, &cli)
+
+	log.Printf("Terminated: %v\n", confirm.Author)
 	return nil
 }
 
@@ -73,13 +73,43 @@ func (s *ChittyChatServer) handshake(stream grpc.ServerStreamingServer[proto.Mes
 	}
 }
 
+func pushStream(stream grpc.ServerStreamingServer[proto.Message], cli *client) {
+	for {
+		select {
+		case <-cli.closed:
+			return
+		case message := <-cli.feed:
+			if err := stream.Send(message); err != nil {
+				log.Printf("Stream terminated for %s. Will close.\n", cli.name)
+				cli.closed <- true
+				return
+			}
+		}
+	}
+}
+
+func (s *ChittyChatServer) broadcastMessage(message *proto.Message) {
+	for i := 0; i < len(s.clients); i++ {
+		cli := s.clients[i]
+		select {
+		case <-cli.closed:
+			s.clients = append(s.clients[:i], s.clients[i+1:]...)
+			i--
+			log.Printf("Removed %s from client slice\n", cli.name)
+		case cli.feed <- message:
+		default:
+			log.Printf("Feed overflow to %s\n", cli.name)
+		}
+	}
+}
+
 func getTime() int64 {
 	return 123
 }
 
 func main() {
 	server := ChittyChatServer{
-		clients: make([]grpc.ServerStreamingServer[proto.Message], 0),
+		clients: make([]client, 0),
 		name:    "ChittyServer",
 	}
 	go server.start()
@@ -91,13 +121,13 @@ func main() {
 func (s *ChittyChatServer) start() {
 	listener, err := net.Listen("tcp", "localhost:5050")
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatalf("failed to listen: %v\n", err)
 	}
 	grpcServer := grpc.NewServer()
 	proto.RegisterChittyChatServiceServer(grpcServer, s)
-	fmt.Printf("server listening at %v", listener.Addr())
+	fmt.Printf("server listening at %v\n", listener.Addr())
 	err = grpcServer.Serve(listener)
 	if err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		log.Fatalf("failed to serve: %v\n", err)
 	}
 }
