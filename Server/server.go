@@ -8,6 +8,8 @@ import (
 	"net"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type ChittyChatServer struct {
@@ -28,15 +30,9 @@ func (s *ChittyChatServer) broadcastMessage(message *proto.Message) {
 }
 
 func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.ServerStreamingServer[proto.Message]) error {
-	log.Printf("JoinMessageBoard call: %v\n", confirm)
+	log.Printf("Incoming client: %v\n", confirm)
 
-	err := stream.Send(&proto.Message{
-		Content:   "\U0001F680 Welcome to ChittyChat, " + confirm.Author + "! \U0001F680",
-		Author:    s.name,
-		LamportTs: getTime(),
-	})
-	if err != nil {
-		log.Printf("JoinMessageBoard error: %v\n", err)
+	if err := s.handshake(stream, confirm.Author); err != nil {
 		return err
 	}
 
@@ -59,6 +55,22 @@ func (s *ChittyChatServer) PostMessage(ctx context.Context, in *proto.Message) (
 		Author:    s.name,
 		LamportTs: getTime(),
 	}, nil
+}
+
+// Sends an initial message to client and returns nil.
+// If an error occurs, it is logged, and a status error for the RPC is returned.
+func (s *ChittyChatServer) handshake(stream grpc.ServerStreamingServer[proto.Message], name string) error {
+	err := stream.Send(&proto.Message{
+		Content:   "\U0001F680 Welcome to ChittyChat, " + name + "! \U0001F680",
+		Author:    s.name,
+		LamportTs: getTime(),
+	})
+	if err != nil {
+		log.Printf("Handshake error: %v\n", err)
+		return status.Error(codes.Aborted, err.Error())
+	} else {
+		return nil
+	}
 }
 
 func getTime() int64 {
