@@ -96,7 +96,8 @@ func (cli *client) streamToClientRoutine(stream grpc.ServerStreamingServer[proto
 		case <-cli.closed:
 			return
 		case message := <-cli.feed:
-			if err := stream.Send(message); err != nil {
+			err := stream.Send(message)
+			if err != nil {
 				log.Printf("Client '%s': Stream terminated. Will close.\n", cli.name)
 				cli.closed <- true
 				return
@@ -139,22 +140,29 @@ func main() {
 		clients: make([]client, 0),
 		name:    "ChittyServer",
 	}
-	server.startService()
+
+	listener := listenOn("localhost:5050")
+	server.startService(listener)
 
 	wait := make(chan bool)
 	<-wait // Run until terminated manually or by error.
 }
 
-// Put a TCP listener on the network and begin serving ChittyChat gRPC service on a goroutine.
-func (s *ChittyChatServer) startService() {
-	listener, err := net.Listen("tcp", "localhost:5050")
+// Obtains a TCP listener on a given network address.
+func listenOn(address string) net.Listener {
+	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatalf("failed to listen: %v\n", err)
 	}
+	return listener
+}
+
+// Begins serving ChittyChat gRPC service as a goroutine and returns.
+func (s *ChittyChatServer) startService(listener net.Listener) {
 	grpcServer := grpc.NewServer()
 	proto.RegisterChittyChatServiceServer(grpcServer, s)
 	fmt.Printf("server listening at %v\n", listener.Addr())
-	err = grpcServer.Serve(listener)
+	err := grpcServer.Serve(listener)
 	if err != nil {
 		log.Fatalf("failed to serve: %v\n", err)
 	}
