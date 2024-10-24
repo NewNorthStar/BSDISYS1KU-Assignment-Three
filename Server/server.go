@@ -44,7 +44,7 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 		LamportTs: getTime(),
 	})
 
-	pushStream(stream, &cli) // Continues until connection terminates.
+	cli.streamToClientRoutine(stream) // Continues until connection terminates.
 
 	log.Printf("Terminated: %v\n", confirm.Author)
 	return nil
@@ -89,7 +89,7 @@ func (s *ChittyChatServer) addNewClient(confirm *proto.Confirm) client {
 
 // Routine call that handles the stream to a client.
 // Runs for the duration of each client connection.
-func pushStream(stream grpc.ServerStreamingServer[proto.Message], cli *client) {
+func (cli *client) streamToClientRoutine(stream grpc.ServerStreamingServer[proto.Message]) {
 	log.Printf("Client '%s': stream open.\n", cli.name)
 	for {
 		select {
