@@ -46,6 +46,12 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 
 	cli.streamToClientRoutine(stream) // Continues until connection terminates.
 
+	s.broadcastMessage(&proto.Message{
+		Content:   confirm.Author + "' left the chat.",
+		Author:    s.name,
+		LamportTs: getTime(),
+	})
+
 	log.Printf("Terminated: %v\n", confirm.Author)
 	return nil
 }
@@ -81,7 +87,7 @@ func (s *ChittyChatServer) addNewClient(confirm *proto.Confirm) client {
 	cli := client{
 		name:   confirm.Author,
 		feed:   make(chan *proto.Message, 20),
-		closed: make(chan bool),
+		closed: make(chan bool, 1),
 	}
 	s.clients = append(s.clients, cli)
 	return cli
@@ -93,8 +99,6 @@ func (cli *client) streamToClientRoutine(stream grpc.ServerStreamingServer[proto
 	log.Printf("Client '%s': stream open.\n", cli.name)
 	for {
 		select {
-		case <-cli.closed:
-			return
 		case message := <-cli.feed:
 			err := stream.Send(message)
 			if err != nil {
