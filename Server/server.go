@@ -22,9 +22,9 @@ type ChittyChatServer struct {
 // Channels for the connection to a client.
 // Each connection is a running coroutine.
 type client struct {
-	name   string
-	feed   chan *proto.Message
-	closed chan bool
+	name     string
+	feed     chan *proto.Message
+	isClosed chan bool
 }
 
 // The client obtains a stream of the chat. Method returns when the stream terminates.
@@ -52,7 +52,6 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 		LamportTs: getTime(),
 	})
 
-	log.Printf("Terminated: %v\n", confirm.Author)
 	return nil
 }
 
@@ -85,9 +84,9 @@ func (s *ChittyChatServer) welcomeClient(stream grpc.ServerStreamingServer[proto
 // Add a new channel struct for control and feed from server to active client stream.
 func (s *ChittyChatServer) addNewClient(confirm *proto.Confirm) client {
 	cli := client{
-		name:   confirm.Author,
-		feed:   make(chan *proto.Message, 20),
-		closed: make(chan bool, 1),
+		name:     confirm.Author,
+		feed:     make(chan *proto.Message, 20),
+		isClosed: make(chan bool, 1),
 	}
 	s.clients = append(s.clients, cli)
 	return cli
@@ -97,17 +96,24 @@ func (s *ChittyChatServer) addNewClient(confirm *proto.Confirm) client {
 // Runs for the duration of each client connection.
 func (cli *client) streamToClientRoutine(stream grpc.ServerStreamingServer[proto.Message]) {
 	log.Printf("Client '%s': stream open.\n", cli.name)
+	close := stream.Context().Done()
+
+main:
 	for {
 		select {
 		case message := <-cli.feed:
 			err := stream.Send(message)
 			if err != nil {
-				log.Printf("Client '%s': Stream terminated. Will close.\n", cli.name)
-				cli.closed <- true
-				return
+				log.Printf("Client '%s': Stream error. Will close.\n", cli.name)
+				break main
 			}
+		case <-close:
+			log.Printf("Client '%s': Stream terminated. Will close.\n", cli.name)
+			break main
 		}
 	}
+
+	cli.isClosed <- true
 }
 
 // Adds a message to the feed channel of each client connection.
@@ -116,7 +122,7 @@ func (s *ChittyChatServer) broadcastMessage(message *proto.Message) {
 	for i := 0; i < len(s.clients); i++ {
 		cli := s.clients[i]
 		select {
-		case <-cli.closed:
+		case <-cli.isClosed:
 			s.removeClient(i)
 			i--
 		case cli.feed <- message:

@@ -2,10 +2,10 @@ syntax = "proto3";
 option go_package = "example/chittychat/grpc/proto";
 
 service ChittyChatService {
-    //A client can publish a message to the service
+    // Broadcast a message to all clients. 
     rpc PostMessage(Message) returns (Confirm);
 
-    //The server can broadcast a recieved message to all participants (including the original sender?)
+    // Obtain a stream of messages from server. 
     rpc JoinMessageBoard(Confirm) returns (stream Message);
 }
 
