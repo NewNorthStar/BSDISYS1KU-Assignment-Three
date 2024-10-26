@@ -96,7 +96,7 @@ func (s *ChittyChatServer) addNewClient(confirm *proto.Confirm) client {
 // Runs for the duration of each client connection.
 func (cli *client) streamToClientRoutine(stream grpc.ServerStreamingServer[proto.Message]) {
 	log.Printf("Client '%s': stream open.\n", cli.name)
-	close := stream.Context().Done()
+	done := stream.Context().Done()
 
 main:
 	for {
@@ -104,11 +104,11 @@ main:
 		case message := <-cli.feed:
 			err := stream.Send(message)
 			if err != nil {
-				log.Printf("Client '%s': Stream error. Will close.\n", cli.name)
+				log.Printf("Client '%s': Stream error. Closing...\n", cli.name)
 				break main
 			}
-		case <-close:
-			log.Printf("Client '%s': Stream terminated. Will close.\n", cli.name)
+		case <-done:
+			log.Printf("Client '%s': Stream terminated. Closing...\n", cli.name)
 			break main
 		}
 	}
