@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"unicode/utf8"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -53,6 +54,10 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 // The server returns a confirm message with a timestamp.
 func (s *ChittyChatServer) PostMessage(ctx context.Context, in *proto.Message) (*proto.Confirm, error) {
 	s.setTime(in.LamportTs)
+	if utf8.RuneCountInString(in.Content) > 128 {
+		log.Printf("PostMessage invalid input: Content too long! From '" + in.Author + "'")
+		return nil, status.Error(codes.Aborted, "Content too long!")
+	}
 	log.Printf("PostMessage: %v\n", in)
 
 	s.broadcastMessage(in)
