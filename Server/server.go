@@ -54,12 +54,13 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 // The server returns a confirm message with a timestamp.
 func (s *ChittyChatServer) PostMessage(ctx context.Context, in *proto.Message) (*proto.Confirm, error) {
 	s.setTime(in.LamportTs)
+
 	if utf8.RuneCountInString(in.Content) > 128 {
-		log.Printf("PostMessage invalid input: Content too long! From '" + in.Author + "'")
+		log.Printf("PostMessage: Invalid input, Content too long! From '" + in.Author + "' at Lamport time " + strconv.FormatInt(s.getTime(), 10))
 		return nil, status.Error(codes.Aborted, "Content too long!")
 	}
-	log.Printf("PostMessage: %v\n", in)
 
+	log.Printf("PostMessage: %v\n", in)
 	s.broadcastMessage(in)
 	return &proto.Confirm{
 		Author:    s.name,
