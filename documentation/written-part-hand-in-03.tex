@@ -1,0 +1,59 @@
+\documentclass[a4paper,11pt]{article}
+
+% Import packages
+\usepackage[a4paper]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% Set title, author name and date
+\title{Chitty-Chat - Report on Assignment}
+\author{rono, ghej, luvr @ ITU}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\pagebreak
+
+\section{Architecture}
+
+We have chosen to develop a server-client architecture. 
+
+\begin{enumerate}
+    \item We can choose when and where to have servers and clients running. On some locations, such as behind a NAT router, other clients may not be able to connect to us. 
+    \item We can develop RPC's between servers later, without changing the interface for clients. 
+\end{enumerate}
+
+In this hand in, we only have the ``monolithic'' server-client setup possible. 
+
+\bigbreak
+
+Had we been able to spend more time on developing our project, we would next have added the ability for servers to be a repeating node for a ``main'' server, with clients connected to all servers being able to broadcast to each other. Servers would forward chat posts to the main server, and propagate broadcasts to other servers and clients. 
+
+\section{RPC's, Choice of Streaming}
+We have a simple gRPC service ``ChittyChatService'' containing two RPC's:
+
+\begin{enumerate}
+    \item ``PostMessage'' Client sends a message to the chat service. The server replies with a confirmation, possibly an error. 
+    \item ``JoinMessageBoard'' Client requests a real-time stream of the chat, providing its identity (a name). The server returns a message stream, which will remain open until closed by either the client or the server. 
+\end{enumerate}
+
+In our case, we have a server-side stream only. Messages are posted by another type of call. This is sufficient as we do not have any user authentication, login, or logout process. Participants simply connect and disconnect from the service freely. 
+
+\section{Logical Timestamps}
+We have chosen to implement Lamport timestamps to show the sequence of operations. 
+
+\begin{enumerate}
+    \item All participants and servers have a time variable, which is incremented by significant operations such as receiving or forwarding messages. 
+    \item Upon receiving a message, a participant or server will update their internal logical time against the incoming timestamp, to whichever is greater. 
+    \item Methods ``getTime'' and ``setTime'' are implemented for this purpose in both server and client. 
+\end{enumerate}
+
+\section{Diagram of Operation}
+text
+
+\end{document}
