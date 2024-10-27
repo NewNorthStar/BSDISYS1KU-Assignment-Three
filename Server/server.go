@@ -32,7 +32,7 @@ type client struct {
 // The client obtains a stream of the chat. Method returns when the stream terminates.
 func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.ServerStreamingServer[proto.Message]) error {
 	s.setTime(confirm.LamportTs)
-	log.Printf("%d JoinMessageBoard: %v\n", s.getTime(), confirm)
+	log.Printf("JoinMessageBoard: %v\n", confirm)
 
 	err := s.welcomeClient(stream, confirm.Author)
 	if err != nil {
@@ -53,7 +53,7 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 // The server returns a confirm message with a timestamp.
 func (s *ChittyChatServer) PostMessage(ctx context.Context, in *proto.Message) (*proto.Confirm, error) {
 	s.setTime(in.LamportTs)
-	log.Printf("%d PostMessage: %v\n", s.getTime(), in)
+	log.Printf("PostMessage: %v\n", in)
 
 	s.broadcastMessage(in)
 	return &proto.Confirm{
@@ -62,6 +62,7 @@ func (s *ChittyChatServer) PostMessage(ctx context.Context, in *proto.Message) (
 	}, nil
 }
 
+// Generates a public join message for broadcast.
 func (s *ChittyChatServer) enteredChatMessage(name string) {
 	time := s.getTime()
 	s.broadcastMessage(&proto.Message{
@@ -71,6 +72,7 @@ func (s *ChittyChatServer) enteredChatMessage(name string) {
 	})
 }
 
+// Generates a public leave message for broadcast.
 func (s *ChittyChatServer) leftChatMessage(name string) {
 	time := s.getTime()
 	s.broadcastMessage(&proto.Message{
@@ -133,6 +135,8 @@ main:
 
 // Adds a message to the feed channel of each client connection.
 // Closed connections are pruned as messages are sent.
+// The message is sent with the next Lamport timestamp, to reflect
+// that repeating the message comes after receiving and processing.
 func (s *ChittyChatServer) broadcastMessage(message *proto.Message) {
 	message.LamportTs = s.getTime()
 	for i := 0; i < len(s.clients); i++ {
