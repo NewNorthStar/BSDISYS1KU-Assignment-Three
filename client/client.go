@@ -15,6 +15,7 @@ import (
 
 var stdIn = setScanner()
 var ctx context.Context = context.Background()
+var closed bool = false
 
 var name string
 
@@ -34,8 +35,9 @@ func runChatService() {
 	client := proto.NewChittyChatServiceClient(conn)
 	stream := joinChatBoard(client)
 
-	for pollStream(stream) {
-	}
+	go pollStream(stream)
+
+	handleUserInput(client)
 }
 
 // Establishes connection to the server.
@@ -66,16 +68,32 @@ func joinChatBoard(client proto.ChittyChatServiceClient) grpc.ServerStreamingCli
 
 // Loop routine for polling stream from server and displaying messages from the chat board.
 // Returns false when loop should interrupt.
-func pollStream(stream grpc.ServerStreamingClient[proto.Message]) bool {
-	msg, err := stream.Recv()
-	if err == io.EOF {
-		fmt.Println("Stream closed. Bye!")
-		return false
-	} else if err != nil {
-		log.Fatal(err)
+func pollStream(stream grpc.ServerStreamingClient[proto.Message]) {
+	for {
+		msg, err := stream.Recv()
+		if err == io.EOF {
+			fmt.Println("Stream closed. Bye!")
+			break
+		} else if err != nil {
+			log.Fatal(err)
+		}
+		printMessage(msg)
 	}
-	printMessage(msg)
-	return true
+	closed = true
+}
+
+func handleUserInput(client proto.ChittyChatServiceClient) {
+	for {
+		if closed {
+			return
+		} else {
+			client.PostMessage(ctx, &proto.Message{
+				Content:   nextLine(),
+				Author:    name,
+				LamportTs: -1,
+			})
+		}
+	}
 }
 
 // Prints the standard chat message format to console.

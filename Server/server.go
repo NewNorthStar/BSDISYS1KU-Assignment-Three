@@ -58,7 +58,7 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 // The incoming message is broadcasted; queued in the feed of all clients.
 // The server returns a confirm message with a timestamp.
 func (s *ChittyChatServer) PostMessage(ctx context.Context, in *proto.Message) (*proto.Confirm, error) {
-	s.broadcastMessage(&proto.Message{})
+	s.broadcastMessage(in)
 	return &proto.Confirm{
 		Author:    s.name,
 		LamportTs: getTime(),
