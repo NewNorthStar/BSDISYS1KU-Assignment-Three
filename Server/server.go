@@ -15,8 +15,9 @@ import (
 // Represents a running ChittyChat server.
 type ChittyChatServer struct {
 	proto.UnimplementedChittyChatServiceServer
-	clients []client
-	name    string
+	clients     []client
+	name        string
+	lamportTime int64
 }
 
 // Channels for the connection to a client.
@@ -29,7 +30,7 @@ type client struct {
 
 // The client obtains a stream of the chat. Method returns when the stream terminates.
 func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.ServerStreamingServer[proto.Message]) error {
-	log.Printf("Incoming client: %v\n", confirm)
+	log.Printf("%d Incoming client: %v\n", s.getTime(), confirm)
 
 	err := s.welcomeClient(stream, confirm.Author)
 	if err != nil {
@@ -41,7 +42,7 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 	s.broadcastMessage(&proto.Message{
 		Content:   "Everyone please welcome '" + confirm.Author + "' to the chat!",
 		Author:    s.name,
-		LamportTs: getTime(),
+		LamportTs: s.getTime(),
 	})
 
 	cli.streamToClientRoutine(stream) // Continues until connection terminates.
@@ -49,7 +50,7 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 	s.broadcastMessage(&proto.Message{
 		Content:   confirm.Author + "' left the chat.",
 		Author:    s.name,
-		LamportTs: getTime(),
+		LamportTs: s.getTime(),
 	})
 
 	return nil
@@ -61,18 +62,20 @@ func (s *ChittyChatServer) PostMessage(ctx context.Context, in *proto.Message) (
 	s.broadcastMessage(in)
 	return &proto.Confirm{
 		Author:    s.name,
-		LamportTs: getTime(),
+		LamportTs: s.getTime(),
 	}, nil
 }
 
 // Sends an initial message to client and returns nil.
 // If an error occurs, it is logged, and a status error for the RPC is returned.
 func (s *ChittyChatServer) welcomeClient(stream grpc.ServerStreamingServer[proto.Message], name string) error {
-	err := stream.Send(&proto.Message{
+	msg := proto.Message{
 		Content:   "\U0001F680 Welcome to ChittyChat, " + name + "! \U0001F680",
 		Author:    s.name,
-		LamportTs: getTime(),
-	})
+		LamportTs: s.getTime(),
+	}
+	err := stream.Send(&msg)
+	logMessage(&msg)
 	if err != nil {
 		log.Printf("Handshake error: %v\n", err)
 		return status.Error(codes.Aborted, err.Error())
@@ -119,6 +122,7 @@ main:
 // Adds a message to the feed channel of each client connection.
 // Closed connections are pruned as messages are sent.
 func (s *ChittyChatServer) broadcastMessage(message *proto.Message) {
+	logMessage(message)
 	for i := 0; i < len(s.clients); i++ {
 		cli := s.clients[i]
 		select {
@@ -140,8 +144,22 @@ func (s *ChittyChatServer) removeClient(i int) {
 	log.Printf("Client '%s': Removed from connections.\n", cli.name)
 }
 
-func getTime() int64 {
-	return 123
+// Prints the standard chat message format to console.
+func logMessage(message *proto.Message) {
+	log.Printf("%d %s: %s\n", message.LamportTs, message.Author, message.Content)
+}
+
+// Gets the next Lamport timestamp.
+func (s *ChittyChatServer) getTime() int64 {
+	s.lamportTime++
+	return s.lamportTime
+}
+
+// Updates the Lamport timestamp to reflect an incoming timestamp.
+func (s *ChittyChatServer) setTime(in int64) {
+	if s.lamportTime < in {
+		s.lamportTime = in
+	}
 }
 
 // Start point for program.

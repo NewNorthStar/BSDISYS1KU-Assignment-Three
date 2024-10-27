@@ -15,9 +15,9 @@ import (
 
 var stdIn = setScanner()
 var ctx context.Context = context.Background()
-var closed bool = false
 
 var name string
+var lamportTime int64
 
 // Start point for program.
 func main() {
@@ -36,7 +36,6 @@ func runChatService() {
 	stream := joinChatBoard(client)
 
 	go pollStream(stream)
-
 	handleUserInput(client)
 }
 
@@ -53,7 +52,7 @@ func getConnectionToServer() *grpc.ClientConn {
 func confirmMessage() *proto.Confirm {
 	return &proto.Confirm{
 		Author:    name,
-		LamportTs: -1,
+		LamportTs: getTime(),
 	}
 }
 
@@ -66,8 +65,7 @@ func joinChatBoard(client proto.ChittyChatServiceClient) grpc.ServerStreamingCli
 	return stream
 }
 
-// Loop routine for polling stream from server and displaying messages from the chat board.
-// Returns false when loop should interrupt.
+// Go-routine for polling stream from server and displaying messages from the chat board.
 func pollStream(stream grpc.ServerStreamingClient[proto.Message]) {
 	for {
 		msg, err := stream.Recv()
@@ -77,22 +75,41 @@ func pollStream(stream grpc.ServerStreamingClient[proto.Message]) {
 		} else if err != nil {
 			log.Fatal(err)
 		}
+		setTime(msg.LamportTs)
 		printMessage(msg)
 	}
-	closed = true
 }
 
+// Main routine for accepting terminal input as messages to be posted.
 func handleUserInput(client proto.ChittyChatServiceClient) {
 	for {
-		if closed {
-			return
-		} else {
-			client.PostMessage(ctx, &proto.Message{
-				Content:   nextLine(),
-				Author:    name,
-				LamportTs: -1,
-			})
+		input := nextLine()
+		if len(input) == 0 {
+			continue
 		}
+		msg := proto.Message{
+			Content:   input,
+			Author:    name,
+			LamportTs: getTime(),
+		}
+		confirm, err := client.PostMessage(ctx, &msg)
+		if err != nil {
+			log.Fatal(err)
+		}
+		setTime(confirm.LamportTs)
+	}
+}
+
+// Gets the next Lamport timestamp.
+func getTime() int64 {
+	lamportTime++
+	return lamportTime
+}
+
+// Updates the Lamport timestamp to reflect an incoming timestamp.
+func setTime(in int64) {
+	if lamportTime < in {
+		lamportTime = in
 	}
 }
 
