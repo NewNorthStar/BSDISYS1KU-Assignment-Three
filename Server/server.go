@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -30,7 +31,8 @@ type client struct {
 
 // The client obtains a stream of the chat. Method returns when the stream terminates.
 func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.ServerStreamingServer[proto.Message]) error {
-	log.Printf("%d Incoming client: %v\n", s.getTime(), confirm)
+	s.setTime(confirm.LamportTs)
+	log.Printf("%d JoinMessageBoard: %v\n", s.getTime(), confirm)
 
 	err := s.welcomeClient(stream, confirm.Author)
 	if err != nil {
@@ -38,20 +40,11 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 	}
 
 	cli := s.addNewClient(confirm)
-
-	s.broadcastMessage(&proto.Message{
-		Content:   "Everyone please welcome '" + confirm.Author + "' to the chat!",
-		Author:    s.name,
-		LamportTs: s.getTime(),
-	})
+	s.enteredChatMessage(cli.name)
 
 	cli.streamToClientRoutine(stream) // Continues until connection terminates.
 
-	s.broadcastMessage(&proto.Message{
-		Content:   confirm.Author + "' left the chat.",
-		Author:    s.name,
-		LamportTs: s.getTime(),
-	})
+	s.leftChatMessage(cli.name)
 
 	return nil
 }
@@ -59,11 +52,32 @@ func (s *ChittyChatServer) JoinMessageBoard(confirm *proto.Confirm, stream grpc.
 // The incoming message is broadcasted; queued in the feed of all clients.
 // The server returns a confirm message with a timestamp.
 func (s *ChittyChatServer) PostMessage(ctx context.Context, in *proto.Message) (*proto.Confirm, error) {
+	s.setTime(in.LamportTs)
+	log.Printf("%d PostMessage: %v\n", s.getTime(), in)
+
 	s.broadcastMessage(in)
 	return &proto.Confirm{
 		Author:    s.name,
 		LamportTs: s.getTime(),
 	}, nil
+}
+
+func (s *ChittyChatServer) enteredChatMessage(name string) {
+	time := s.getTime()
+	s.broadcastMessage(&proto.Message{
+		Content:   "Participant " + name + " joined Chitty-Chat at Lamport time " + strconv.FormatInt(time, 10),
+		Author:    s.name,
+		LamportTs: time,
+	})
+}
+
+func (s *ChittyChatServer) leftChatMessage(name string) {
+	time := s.getTime()
+	s.broadcastMessage(&proto.Message{
+		Content:   "Participant " + name + " left Chitty-Chat at Lamport time " + strconv.FormatInt(time, 10),
+		Author:    s.name,
+		LamportTs: time,
+	})
 }
 
 // Sends an initial message to client and returns nil.
@@ -75,7 +89,6 @@ func (s *ChittyChatServer) welcomeClient(stream grpc.ServerStreamingServer[proto
 		LamportTs: s.getTime(),
 	}
 	err := stream.Send(&msg)
-	logMessage(&msg)
 	if err != nil {
 		log.Printf("Handshake error: %v\n", err)
 		return status.Error(codes.Aborted, err.Error())
@@ -98,7 +111,6 @@ func (s *ChittyChatServer) addNewClient(confirm *proto.Confirm) client {
 // Routine call that handles the stream to a client.
 // Runs for the duration of each client connection.
 func (cli *client) streamToClientRoutine(stream grpc.ServerStreamingServer[proto.Message]) {
-	log.Printf("Client '%s': stream open.\n", cli.name)
 	done := stream.Context().Done()
 
 main:
@@ -122,7 +134,7 @@ main:
 // Adds a message to the feed channel of each client connection.
 // Closed connections are pruned as messages are sent.
 func (s *ChittyChatServer) broadcastMessage(message *proto.Message) {
-	logMessage(message)
+	message.LamportTs = s.getTime()
 	for i := 0; i < len(s.clients); i++ {
 		cli := s.clients[i]
 		select {
@@ -142,11 +154,6 @@ func (s *ChittyChatServer) removeClient(i int) {
 	cli := s.clients[i]
 	s.clients = append(s.clients[:i], s.clients[i+1:]...)
 	log.Printf("Client '%s': Removed from connections.\n", cli.name)
-}
-
-// Prints the standard chat message format to console.
-func logMessage(message *proto.Message) {
-	log.Printf("%d %s: %s\n", message.LamportTs, message.Author, message.Content)
 }
 
 // Gets the next Lamport timestamp.
