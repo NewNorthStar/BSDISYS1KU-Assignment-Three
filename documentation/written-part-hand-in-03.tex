@@ -6,6 +6,13 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{pgf-umlsd}
+\usepackage{listings}
+
+\lstset{
+basicstyle=\small\ttfamily,
+columns=flexible,
+breaklines=true
+}
 
 % based on \newthread macro from pgf-umlsd.sty
 % add fourth argument (third mandatory) that defines the xshift of a thread.
@@ -66,7 +73,7 @@ We have chosen to implement Lamport timestamps to show the sequence of operation
     \item Methods ``getTime'' and ``setTime'' are implemented for this purpose in both server and client. 
 \end{enumerate}
 
-\section{Diagram of Operation}
+\section{Sequence Diagrams}
 
 \subsection{Joining Chat}
 
@@ -194,5 +201,86 @@ We have chosen to implement Lamport timestamps to show the sequence of operation
     \mess{a}{disconnect, stream closed}{s}
 \end{sequencediagram}
 
+\pagebreak
+
+\section{Log Files}
+Appendix of log files from which we made the sequence diagrams.
+
+\subsection{server.txt}
+
+\begin{lstlisting}
+2024/10/28 08:57:37 server listening at 127.0.0.1:5050
+2024/10/28 08:57:56 JoinMessageBoard: author:"Alice"  lamport_ts:1
+2024/10/28 08:58:05 JoinMessageBoard: author:"Bob"  lamport_ts:1
+2024/10/28 08:58:23 PostMessage: content:"Hi Bob!"  author:"Alice"  lamport_ts:8
+2024/10/28 08:58:29 PostMessage: content:"Hi Alice!"  author:"Bob"  lamport_ts:10
+2024/10/28 08:58:45 JoinMessageBoard: author:"Charlie"  lamport_ts:1
+2024/10/28 08:58:53 PostMessage: content:"Hello Everyone!"  author:"Charlie"  lamport_ts:16
+2024/10/28 08:59:17 PostMessage: content:"Hello Charlie!"  author:"Alice"  lamport_ts:18
+2024/10/28 08:59:37 PostMessage: content:"Don't get kicked off with an overlong message charlie!"  author:"Bob"  lamport_ts:20
+2024/10/28 08:59:48 PostMessage: content:"I will try. "  author:"Charlie"  lamport_ts:22
+2024/10/28 09:00:29 PostMessage: Invalid input, Content too long! From 'Charlie' at Lamport time 26
+2024/10/28 09:00:29 Client 'Charlie': Stream terminated. Closing...
+2024/10/28 09:00:39 PostMessage: content:"It happened!"  author:"Alice"  lamport_ts:29
+2024/10/28 09:00:39 Client 'Charlie': Removed from connections.
+2024/10/28 09:00:45 PostMessage: content:"Bye!"  author:"Bob"  lamport_ts:31
+2024/10/28 09:00:48 Client 'Bob': Stream terminated. Closing...
+2024/10/28 09:00:52 Client 'Alice': Stream terminated. Closing...
+2024/10/28 09:00:52 Client 'Bob': Removed from connections.
+\end{lstlisting}
+
+\pagebreak
+
+\subsection{Alice.txt}
+
+\begin{lstlisting}
+2024/10/28 08:57:56 2 ChittyServer: Welcome to ChittyChat, Alice!
+2024/10/28 08:57:56 4 ChittyServer: Participant Alice joined Chitty-Chat at Lamport time 3
+2024/10/28 08:58:05 7 ChittyServer: Participant Bob joined Chitty-Chat at Lamport time 6
+2024/10/28 08:58:23 9 Alice: Hi Bob!
+2024/10/28 08:58:29 11 Bob: Hi Alice!
+2024/10/28 08:58:45 15 ChittyServer: Participant Charlie joined Chitty-Chat at Lamport time 14
+2024/10/28 08:58:53 17 Charlie: Hello Everyone!
+2024/10/28 08:59:17 19 Alice: Hello Charlie!
+2024/10/28 08:59:37 21 Bob: Don't get kicked off with an overlong message charlie!
+2024/10/28 08:59:48 23 Charlie: I will try. 
+2024/10/28 09:00:29 28 ChittyServer: Participant Charlie left Chitty-Chat at Lamport time 27
+2024/10/28 09:00:39 30 Alice: It happened!
+2024/10/28 09:00:45 32 Bob: Bye!
+2024/10/28 09:00:48 35 ChittyServer: Participant Bob left Chitty-Chat at Lamport time 34
+\end{lstlisting}
+
+\pagebreak
+
+\subsection{Bob.txt}
+
+\begin{lstlisting}
+2024/10/28 08:58:05 5 ChittyServer: Welcome to ChittyChat, Bob!
+2024/10/28 08:58:05 7 ChittyServer: Participant Bob joined Chitty-Chat at Lamport time 6
+2024/10/28 08:58:23 9 Alice: Hi Bob!
+2024/10/28 08:58:29 11 Bob: Hi Alice!
+2024/10/28 08:58:45 15 ChittyServer: Participant Charlie joined Chitty-Chat at Lamport time 14
+2024/10/28 08:58:53 17 Charlie: Hello Everyone!
+2024/10/28 08:59:17 19 Alice: Hello Charlie!
+2024/10/28 08:59:37 21 Bob: Don't get kicked off with an overlong message charlie!
+2024/10/28 08:59:48 23 Charlie: I will try. 
+2024/10/28 09:00:29 28 ChittyServer: Participant Charlie left Chitty-Chat at Lamport time 27
+2024/10/28 09:00:39 30 Alice: It happened!
+2024/10/28 09:00:45 32 Bob: Bye!    
+\end{lstlisting}
+
+\pagebreak
+
+\subsection{Charlie.txt}
+
+\begin{lstlisting}
+2024/10/28 08:58:45 13 ChittyServer: Welcome to ChittyChat, Charlie!
+2024/10/28 08:58:45 15 ChittyServer: Participant Charlie joined Chitty-Chat at Lamport time 14
+2024/10/28 08:58:53 17 Charlie: Hello Everyone!
+2024/10/28 08:59:17 19 Alice: Hello Charlie!
+2024/10/28 08:59:37 21 Bob: Don't get kicked off with an overlong message charlie!
+2024/10/28 08:59:48 23 Charlie: I will try. 
+2024/10/28 09:00:29 rpc error: code = Aborted desc = Content too long!
+\end{lstlisting}
 
 \end{document}
