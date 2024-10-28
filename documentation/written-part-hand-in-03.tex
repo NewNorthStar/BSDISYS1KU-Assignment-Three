@@ -5,6 +5,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{pgf-umlsd}
 
 % Set title, author name and date
 \title{Chitty-Chat - Report on Assignment}
@@ -54,6 +55,13 @@ We have chosen to implement Lamport timestamps to show the sequence of operation
 \end{enumerate}
 
 \section{Diagram of Operation}
-text
+\begin{sequencediagram}
+    \newthread{s}{:ChittyChatService}
+    \newthread[gray]{a}{:Alice}
+    \newthread[gray]{b}{:Bob}
+    \newthread[gray]{c}{:Charlie}
+
+    \mess[1]{s}{ping}{b}
+\end{sequencediagram}
 
 \end{document}
