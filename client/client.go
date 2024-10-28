@@ -24,6 +24,12 @@ func main() {
 	fmt.Print("Enter your callsign and press ENTER: ")
 	name = nextLine()
 
+	logfile, err := os.Create(name + ".txt")
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+	log.SetOutput(logfile)
+
 	runChatService()
 }
 
@@ -70,7 +76,7 @@ func pollStream(stream grpc.ServerStreamingClient[proto.Message]) {
 	for {
 		msg, err := stream.Recv()
 		if err == io.EOF {
-			fmt.Println("Stream closed. Bye!")
+			log.Println("Stream closed. Bye!")
 			break
 		} else if err != nil {
 			log.Fatal(err)
@@ -115,7 +121,7 @@ func setTime(in int64) {
 
 // Prints the standard chat message format to console.
 func printMessage(message *proto.Message) {
-	fmt.Printf("%d %s: %s\n", message.LamportTs, message.Author, message.Content)
+	log.Printf("%d %s: %s\n", message.LamportTs, message.Author, message.Content)
 }
 
 // Setup for stdIn (input from console). Any scanner settings go here.

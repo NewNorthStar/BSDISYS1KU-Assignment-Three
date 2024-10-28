@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"strconv"
 	"unicode/utf8"
 
@@ -181,6 +182,12 @@ func (s *ChittyChatServer) setTime(in int64) {
 
 // Start point for program.
 func main() {
+	logfile, err := os.Create("server.txt")
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+	log.SetOutput(logfile)
+
 	server := ChittyChatServer{
 		clients: make([]client, 0),
 		name:    "ChittyServer",
@@ -207,6 +214,7 @@ func (s *ChittyChatServer) startService(listener net.Listener) {
 	grpcServer := grpc.NewServer()
 	proto.RegisterChittyChatServiceServer(grpcServer, s)
 	fmt.Printf("server listening at %v\n", listener.Addr())
+	log.Printf("server listening at %v\n", listener.Addr())
 	err := grpcServer.Serve(listener)
 	if err != nil {
 		log.Fatalf("failed to serve: %v\n", err)
