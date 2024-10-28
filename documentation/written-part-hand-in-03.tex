@@ -7,6 +7,18 @@
 \usepackage{amssymb}
 \usepackage{pgf-umlsd}
 
+% based on \newthread macro from pgf-umlsd.sty
+% add fourth argument (third mandatory) that defines the xshift of a thread.
+% that argument gets passed to \newinst, which has an optional
+% argument that defines the shift
+\newcommand{\newthreadShift}[4][gray!30]{
+  \newinst[#4]{#2}{#3}
+  \stepcounter{threadnum}
+  \node[below of=inst\theinstnum,node distance=0.8cm] (thread\thethreadnum) {};
+  \tikzstyle{threadcolor\thethreadnum}=[fill=#1]
+  \tikzstyle{instcolor#2}=[fill=#1]
+}
+
 % Set title, author name and date
 \title{Chitty-Chat - Report on Assignment}
 \author{rono, ghej, luvr @ ITU}
@@ -57,11 +69,46 @@ We have chosen to implement Lamport timestamps to show the sequence of operation
 \section{Diagram of Operation}
 \begin{sequencediagram}
     \newthread{s}{:ChittyChatService}
-    \newthread[gray]{a}{:Alice}
-    \newthread[gray]{b}{:Bob}
-    \newthread[gray]{c}{:Charlie}
+    
+    \newthreadShift{a}{:Alice}{2cm}
+    \begin{call}{a}{JMB(confirm:1)}{s}{Message Stream}
+    \end{call}
 
-    \mess[1]{s}{ping}{b}
+    \mess{s}{message1, server:2}{a}
+    \mess{s}{message2, server:4}{a}
+
+    \newthreadShift{b}{:Bob}{2cm}
+    \begin{call}{b}{JMB(confirm:1)}{s}{Message Stream}
+    \end{call}
+
+    \mess{s}{message3, server:5}{b}
+    \mess{s}{message4, server:7}{a}
+    \mess{s}{message4, server:7}{b}
+
+    \begin{call}{a}{PM(message5, alice:8)}{s}{confirm:10}
+        \mess{s}{message5, alice:9}{a}
+        \mess{s}{message5, alice:9}{b}
+    \end{call}
+
+    \begin{call}{b}{PM(message6, bob:10)}{s}{confirm:12}
+        \mess{s}{message6, bob:11}{a}
+        \mess{s}{message6, bob:11}{b}
+    \end{call}
+
+    \newthreadShift{c}{:Charlie}{2cm}
+    \begin{call}{c}{JMB(confirm:1)}{s}{Message Stream}
+    \end{call}
+    \mess{s}{message7, server:13}{c}
+    \mess{s}{message8, server:15}{a}
+    \mess{s}{message8, server:15}{b}
+    \mess{s}{message8, server:15}{c}
+
+    \begin{call}{c}{PM(message9, charlie:16)}{s}{confirm:18}
+        \mess{s}{message9, charlie:17}{a}
+        \mess{s}{message9, charlie:17}{b}
+        \mess{s}{message9, charlie:17}{c}
+    \end{call}
+
 \end{sequencediagram}
 
 \end{document}
