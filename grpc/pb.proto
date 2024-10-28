@@ -1,0 +1,25 @@
+syntax = "proto3";
+option go_package = "example/chittychat/grpc/proto";
+
+service ChittyChatService {
+    // Broadcast a message to all clients. 
+    rpc PostMessage(Message) returns (Confirm);
+
+    // Obtain a stream of messages from server. 
+    rpc JoinMessageBoard(Confirm) returns (stream Message);
+}
+
+message Message {
+    //A message has a UTF-8 string with a maximum of 128 characters.
+    //It also has a timestamp (Vector or Lamport)
+    string content = 1;
+    string author = 2;
+    int64 lamport_ts = 3;
+}
+
+message Confirm {
+    string author = 2;
+    int64 lamport_ts = 3;
+}
+
+message Empty{}

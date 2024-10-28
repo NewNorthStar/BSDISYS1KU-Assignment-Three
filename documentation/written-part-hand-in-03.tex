@@ -1,0 +1,289 @@
+\documentclass[a4paper,11pt]{article}
+
+% Import packages
+\usepackage[a4paper]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{pgf-umlsd}
+\usepackage{listings}
+
+\lstset{
+basicstyle=\small\ttfamily,
+columns=flexible,
+breaklines=true
+}
+
+% based on \newthread macro from pgf-umlsd.sty
+% add fourth argument (third mandatory) that defines the xshift of a thread.
+% that argument gets passed to \newinst, which has an optional
+% argument that defines the shift
+\newcommand{\newthreadShift}[4][gray!30]{
+  \newinst[#4]{#2}{#3}
+  \stepcounter{threadnum}
+  \node[below of=inst\theinstnum,node distance=0.8cm] (thread\thethreadnum) {};
+  \tikzstyle{threadcolor\thethreadnum}=[fill=#1]
+  \tikzstyle{instcolor#2}=[fill=#1]
+}
+
+% Set title, author name and date
+\title{Chitty-Chat - Report on Assignment}
+\author{rono, ghej, luvr @ ITU}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\pagebreak
+
+\section{Link to Project on GitHub}
+https://github.com/NewNorthStar/BSDISYS1KU-Assignment-Three
+
+\section{Architecture}
+
+We have chosen to develop a server-client architecture. 
+
+\begin{enumerate}
+    \item We can choose when and where to have servers and clients running. On some locations, such as behind a NAT router, other clients may not be able to connect to us. 
+    \item We can develop RPC's between servers later, without changing the interface for clients. 
+\end{enumerate}
+
+In this hand in, we only have the ``monolithic'' server-client setup possible. 
+
+\bigbreak
+
+Had we been able to spend more time on developing our project, we would next have added the ability for servers to be a repeating node for a ``main'' server, with clients connected to all servers being able to broadcast to each other. Servers would forward chat posts to the main server, and propagate broadcasts to other servers and clients. 
+
+\section{RPC's, Choice of Streaming}
+We have a simple gRPC service ``ChittyChatService'' containing two RPC's:
+
+\begin{enumerate}
+    \item ``PostMessage'' Client sends a message to the chat service. The server replies with a confirmation, possibly an error. 
+    \item ``JoinMessageBoard'' Client requests a real-time stream of the chat, providing its identity (a name). The server returns a message stream, which will remain open until closed by either the client or the server. 
+\end{enumerate}
+
+In our case, we have a server-side stream only. Messages are posted by another type of call. This is sufficient as we do not have any user authentication, login, or logout process. Participants simply connect and disconnect from the service freely. 
+
+\section{Logical Timestamps}
+We have chosen to implement Lamport timestamps to show the sequence of operations. 
+
+\begin{enumerate}
+    \item All participants and servers have a time variable, which is incremented by significant operations such as receiving or forwarding messages. 
+    \item Upon receiving a message, a participant or server will update their internal logical time against the incoming timestamp, to whichever is greater. 
+    \item Methods ``getTime'' and ``setTime'' are implemented for this purpose in both server and client. 
+\end{enumerate}
+
+\section{Sequence Diagrams}
+
+\subsection{Joining Chat}
+
+\begin{enumerate}
+    \item Alice joins the chat. Server posts `message1' to Alice, then broadcasts `message2'.
+    \item Bob joins the chat. Server posts `message3' to Bob, then broadcasts `message4'.
+    \item Alice uses the `PostMessage()' method to greet Bob with `message5'. Bob does likewise with `message6'. 
+    \item Charlie joins the chat. Server posts `message7' to Charlie, then broadcasts `message8'.
+\end{enumerate}
+
+\begin{sequencediagram}
+    \newthread{s}{:ChittyChatService}
+    
+    \newthreadShift{a}{:Alice}{1.8cm}
+    \newthreadShift{b}{:Bob}{1.8cm}
+    \newthreadShift{c}{:Charlie}{1.8cm}
+
+    \begin{call}{a}{JMB(confirm:1)}{s}{Message Stream}
+    \end{call}
+
+    \mess{s}{message1, server:2}{a}
+    \mess{s}{message2, server:4}{a}
+
+    
+    \begin{call}{b}{JMB(confirm:1)}{s}{Message Stream}
+    \end{call}
+
+    \mess{s}{message3, server:5}{b}
+    \mess{s}{message4, server:7}{a}
+    \mess{s}{message4, server:7}{b}
+
+    \begin{call}{a}{PM(message5, alice:8)}{s}{confirm:10}
+        \mess{s}{message5, alice:9}{a}
+        \mess{s}{message5, alice:9}{b}
+    \end{call}
+
+    \begin{call}{b}{PM(message6, bob:10)}{s}{confirm:12}
+        \mess{s}{message6, bob:11}{a}
+        \mess{s}{message6, bob:11}{b}
+    \end{call}
+    
+    \begin{call}{c}{JMB(confirm:1)}{s}{Message Stream}
+    \end{call}
+    \mess{s}{message7, server:13}{c}
+    \mess{s}{message8, server:15}{a}
+    \mess{s}{message8, server:15}{b}
+    \mess{s}{message8, server:15}{c}
+\end{sequencediagram}
+
+\pagebreak
+\subsection{Chat Messages}
+
+\begin{enumerate}
+    \item Charlie uses `PostMessage()' to greet Alice and Bob. 
+    \item Alice and Bob reply to Charlie. Charlie responds. 
+\end{enumerate}
+
+\begin{sequencediagram}
+    \newthread{s}{:ChittyChatService}
+    
+    \newthreadShift{a}{:Alice}{1.8cm}
+    \newthreadShift{b}{:Bob}{1.8cm}
+    \newthreadShift{c}{:Charlie}{1.8cm}
+
+    \begin{call}{c}{PM(message9, charlie:16)}{s}{confirm:18}
+        \mess{s}{message9, charlie:17}{a}
+        \mess{s}{message9, charlie:17}{b}
+        \mess{s}{message9, charlie:17}{c}
+    \end{call}
+
+    \begin{call}{a}{PM(message10, alice:18)}{s}{confirm:20}
+        \mess{s}{message10, alice:19}{a}
+        \mess{s}{message10, alice:19}{b}
+        \mess{s}{message10, alice:19}{c}
+    \end{call}
+
+    \begin{call}{b}{PM(message11, bob:20)}{s}{confirm:22}
+        \mess{s}{message11, bob:21}{a}
+        \mess{s}{message11, bob:21}{b}
+        \mess{s}{message11, bob:21}{c}
+    \end{call}
+
+    \begin{call}{c}{PM(message12, charlie:22)}{s}{confirm:24}
+        \mess{s}{message12, charlie:23}{a}
+        \mess{s}{message12, charlie:23}{b}
+        \mess{s}{message12, charlie:23}{c}
+    \end{call}
+\end{sequencediagram}
+
+\pagebreak
+\subsection{Long Message Error and Leaving Chat}
+
+\begin{enumerate}
+    \item Charlie tries to post a message, which is too long. The server disconnects Charlie. A leave message `message14' is broadcast.
+    \item Alice reacts to Charlie having unexpectedly left the chat. 
+    \item Bob posts bye in the chat. 
+    \item Bob leaves the chat. Then Alice leaves as well. 
+\end{enumerate}
+
+\begin{sequencediagram}
+    \newthread{s}{:ChittyChatService}
+    
+    \newthreadShift{a}{:Alice}{1.8cm}
+    \newthreadShift{b}{:Bob}{1.8cm}
+    \newthreadShift{c}{:Charlie}{1.8cm}
+
+    \begin{call}{c}{PM(message13, charlie:25)}{s}{error, stream closed}
+    \end{call}
+    \mess{s}{message14, server:28}{a}
+    \mess{s}{message14, server:28}{b}
+
+    \begin{call}{a}{PM(message15, alice:29)}{s}{confirm:31}
+        \mess{s}{message15, alice:30}{a}
+        \mess{s}{message15, alice:30}{b}
+    \end{call}
+
+    \begin{call}{b}{PM(message16, bob:31)}{s}{confirm:33}
+        \mess{s}{message16, bob:32}{a}
+        \mess{s}{message16, bob:32}{b}
+    \end{call}
+
+    \mess{b}{disconnect, stream closed}{s}
+    \mess{s}{message17, server:35}{a}
+
+    \mess{a}{disconnect, stream closed}{s}
+\end{sequencediagram}
+
+\pagebreak
+
+\section{Log Files}
+Appendix of log files from which we made the sequence diagrams.
+
+\subsection{server.txt}
+
+\begin{lstlisting}
+2024/10/28 08:57:37 server listening at 127.0.0.1:5050
+2024/10/28 08:57:56 JoinMessageBoard: author:"Alice"  lamport_ts:1
+2024/10/28 08:58:05 JoinMessageBoard: author:"Bob"  lamport_ts:1
+2024/10/28 08:58:23 PostMessage: content:"Hi Bob!"  author:"Alice"  lamport_ts:8
+2024/10/28 08:58:29 PostMessage: content:"Hi Alice!"  author:"Bob"  lamport_ts:10
+2024/10/28 08:58:45 JoinMessageBoard: author:"Charlie"  lamport_ts:1
+2024/10/28 08:58:53 PostMessage: content:"Hello Everyone!"  author:"Charlie"  lamport_ts:16
+2024/10/28 08:59:17 PostMessage: content:"Hello Charlie!"  author:"Alice"  lamport_ts:18
+2024/10/28 08:59:37 PostMessage: content:"Don't get kicked off with an overlong message charlie!"  author:"Bob"  lamport_ts:20
+2024/10/28 08:59:48 PostMessage: content:"I will try. "  author:"Charlie"  lamport_ts:22
+2024/10/28 09:00:29 PostMessage: Invalid input, Content too long! From 'Charlie' at Lamport time 26
+2024/10/28 09:00:29 Client 'Charlie': Stream terminated. Closing...
+2024/10/28 09:00:39 PostMessage: content:"It happened!"  author:"Alice"  lamport_ts:29
+2024/10/28 09:00:39 Client 'Charlie': Removed from connections.
+2024/10/28 09:00:45 PostMessage: content:"Bye!"  author:"Bob"  lamport_ts:31
+2024/10/28 09:00:48 Client 'Bob': Stream terminated. Closing...
+2024/10/28 09:00:52 Client 'Alice': Stream terminated. Closing...
+2024/10/28 09:00:52 Client 'Bob': Removed from connections.
+\end{lstlisting}
+
+\pagebreak
+
+\subsection{Alice.txt}
+
+\begin{lstlisting}
+2024/10/28 08:57:56 2 ChittyServer: Welcome to ChittyChat, Alice!
+2024/10/28 08:57:56 4 ChittyServer: Participant Alice joined Chitty-Chat at Lamport time 3
+2024/10/28 08:58:05 7 ChittyServer: Participant Bob joined Chitty-Chat at Lamport time 6
+2024/10/28 08:58:23 9 Alice: Hi Bob!
+2024/10/28 08:58:29 11 Bob: Hi Alice!
+2024/10/28 08:58:45 15 ChittyServer: Participant Charlie joined Chitty-Chat at Lamport time 14
+2024/10/28 08:58:53 17 Charlie: Hello Everyone!
+2024/10/28 08:59:17 19 Alice: Hello Charlie!
+2024/10/28 08:59:37 21 Bob: Don't get kicked off with an overlong message charlie!
+2024/10/28 08:59:48 23 Charlie: I will try. 
+2024/10/28 09:00:29 28 ChittyServer: Participant Charlie left Chitty-Chat at Lamport time 27
+2024/10/28 09:00:39 30 Alice: It happened!
+2024/10/28 09:00:45 32 Bob: Bye!
+2024/10/28 09:00:48 35 ChittyServer: Participant Bob left Chitty-Chat at Lamport time 34
+\end{lstlisting}
+
+\pagebreak
+
+\subsection{Bob.txt}
+
+\begin{lstlisting}
+2024/10/28 08:58:05 5 ChittyServer: Welcome to ChittyChat, Bob!
+2024/10/28 08:58:05 7 ChittyServer: Participant Bob joined Chitty-Chat at Lamport time 6
+2024/10/28 08:58:23 9 Alice: Hi Bob!
+2024/10/28 08:58:29 11 Bob: Hi Alice!
+2024/10/28 08:58:45 15 ChittyServer: Participant Charlie joined Chitty-Chat at Lamport time 14
+2024/10/28 08:58:53 17 Charlie: Hello Everyone!
+2024/10/28 08:59:17 19 Alice: Hello Charlie!
+2024/10/28 08:59:37 21 Bob: Don't get kicked off with an overlong message charlie!
+2024/10/28 08:59:48 23 Charlie: I will try. 
+2024/10/28 09:00:29 28 ChittyServer: Participant Charlie left Chitty-Chat at Lamport time 27
+2024/10/28 09:00:39 30 Alice: It happened!
+2024/10/28 09:00:45 32 Bob: Bye!    
+\end{lstlisting}
+
+\pagebreak
+
+\subsection{Charlie.txt}
+
+\begin{lstlisting}
+2024/10/28 08:58:45 13 ChittyServer: Welcome to ChittyChat, Charlie!
+2024/10/28 08:58:45 15 ChittyServer: Participant Charlie joined Chitty-Chat at Lamport time 14
+2024/10/28 08:58:53 17 Charlie: Hello Everyone!
+2024/10/28 08:59:17 19 Alice: Hello Charlie!
+2024/10/28 08:59:37 21 Bob: Don't get kicked off with an overlong message charlie!
+2024/10/28 08:59:48 23 Charlie: I will try. 
+2024/10/28 09:00:29 rpc error: code = Aborted desc = Content too long!
+\end{lstlisting}
+
+\end{document}
