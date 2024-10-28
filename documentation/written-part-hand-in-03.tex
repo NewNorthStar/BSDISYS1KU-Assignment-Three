@@ -67,17 +67,30 @@ We have chosen to implement Lamport timestamps to show the sequence of operation
 \end{enumerate}
 
 \section{Diagram of Operation}
+
+\subsection{Joining Chat}
+
+\begin{enumerate}
+    \item Alice joins the chat. Server posts `message1' to Alice, then broadcasts `message2'.
+    \item Bob joins the chat. Server posts `message3' to Bob, then broadcasts `message4'.
+    \item Alice uses the `PostMessage()' method to greet Bob with `message5'. Bob does likewise with `message6'. 
+    \item Charlie joins the chat. Server posts `message7' to Charlie, then broadcasts `message8'.
+\end{enumerate}
+
 \begin{sequencediagram}
     \newthread{s}{:ChittyChatService}
     
-    \newthreadShift{a}{:Alice}{2cm}
+    \newthreadShift{a}{:Alice}{1.8cm}
+    \newthreadShift{b}{:Bob}{1.8cm}
+    \newthreadShift{c}{:Charlie}{1.8cm}
+
     \begin{call}{a}{JMB(confirm:1)}{s}{Message Stream}
     \end{call}
 
     \mess{s}{message1, server:2}{a}
     \mess{s}{message2, server:4}{a}
 
-    \newthreadShift{b}{:Bob}{2cm}
+    
     \begin{call}{b}{JMB(confirm:1)}{s}{Message Stream}
     \end{call}
 
@@ -94,14 +107,29 @@ We have chosen to implement Lamport timestamps to show the sequence of operation
         \mess{s}{message6, bob:11}{a}
         \mess{s}{message6, bob:11}{b}
     \end{call}
-
-    \newthreadShift{c}{:Charlie}{2cm}
+    
     \begin{call}{c}{JMB(confirm:1)}{s}{Message Stream}
     \end{call}
     \mess{s}{message7, server:13}{c}
     \mess{s}{message8, server:15}{a}
     \mess{s}{message8, server:15}{b}
     \mess{s}{message8, server:15}{c}
+\end{sequencediagram}
+
+\pagebreak
+\subsection{Chat Messages}
+
+\begin{enumerate}
+    \item Charlie uses `PostMessage()' to greet Alice and Bob. 
+    \item Alice and Bob reply to Charlie. Charlie responds. 
+\end{enumerate}
+
+\begin{sequencediagram}
+    \newthread{s}{:ChittyChatService}
+    
+    \newthreadShift{a}{:Alice}{1.8cm}
+    \newthreadShift{b}{:Bob}{1.8cm}
+    \newthreadShift{c}{:Charlie}{1.8cm}
 
     \begin{call}{c}{PM(message9, charlie:16)}{s}{confirm:18}
         \mess{s}{message9, charlie:17}{a}
@@ -109,6 +137,62 @@ We have chosen to implement Lamport timestamps to show the sequence of operation
         \mess{s}{message9, charlie:17}{c}
     \end{call}
 
+    \begin{call}{a}{PM(message10, alice:18)}{s}{confirm:20}
+        \mess{s}{message10, alice:19}{a}
+        \mess{s}{message10, alice:19}{b}
+        \mess{s}{message10, alice:19}{c}
+    \end{call}
+
+    \begin{call}{b}{PM(message11, bob:20)}{s}{confirm:22}
+        \mess{s}{message11, bob:21}{a}
+        \mess{s}{message11, bob:21}{b}
+        \mess{s}{message11, bob:21}{c}
+    \end{call}
+
+    \begin{call}{c}{PM(message12, charlie:22)}{s}{confirm:24}
+        \mess{s}{message12, charlie:23}{a}
+        \mess{s}{message12, charlie:23}{b}
+        \mess{s}{message12, charlie:23}{c}
+    \end{call}
 \end{sequencediagram}
+
+\pagebreak
+\subsection{Long Message Error and Leaving Chat}
+
+\begin{enumerate}
+    \item Charlie tries to post a message, which is too long. The server disconnects Charlie. A leave message `message14' is broadcast.
+    \item Alice reacts to Charlie having unexpectedly left the chat. 
+    \item Bob posts bye in the chat. 
+    \item Bob leaves the chat. Then Alice leaves as well. 
+\end{enumerate}
+
+\begin{sequencediagram}
+    \newthread{s}{:ChittyChatService}
+    
+    \newthreadShift{a}{:Alice}{1.8cm}
+    \newthreadShift{b}{:Bob}{1.8cm}
+    \newthreadShift{c}{:Charlie}{1.8cm}
+
+    \begin{call}{c}{PM(message13, charlie:25)}{s}{error, stream closed}
+    \end{call}
+    \mess{s}{message14, server:28}{a}
+    \mess{s}{message14, server:28}{b}
+
+    \begin{call}{a}{PM(message15, alice:29)}{s}{confirm:31}
+        \mess{s}{message15, alice:30}{a}
+        \mess{s}{message15, alice:30}{b}
+    \end{call}
+
+    \begin{call}{b}{PM(message16, bob:31)}{s}{confirm:33}
+        \mess{s}{message16, bob:32}{a}
+        \mess{s}{message16, bob:32}{b}
+    \end{call}
+
+    \mess{b}{disconnect, stream closed}{s}
+    \mess{s}{message17, server:35}{a}
+
+    \mess{a}{disconnect, stream closed}{s}
+\end{sequencediagram}
+
 
 \end{document}
